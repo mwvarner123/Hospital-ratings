@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hospital Ratings Collector v4</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --accent: #58a6ff; --accent2: #3fb950; --warn: #f78166;
+    --text: #e6edf3; --muted: #8b949e; --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; min-height: 100vh; padding: 24px 16px 48px; }
+  header { text-align: center; margin-bottom: 32px; }
+  header h1 { font-family: 'Playfair Display', serif; font-size: clamp(1.6rem, 5vw, 2.4rem); color: var(--text); line-height: 1.2; margin-bottom: 8px; }
+  header p { color: var(--muted); font-size: 0.78rem; letter-spacing: 0.05em; }
+  .version { display: inline-block; background: var(--accent); color: #0d1117; font-size: 0.65rem; font-weight: 500; padding: 2px 8px; border-radius: 999px; margin-top: 8px; letter-spacing: 0.1em; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; max-width: 560px; margin: 0 auto 20px; }
+  label { display: block; font-size: 0.72rem; letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; }
+  input[type="text"] { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 0.82rem; padding: 12px 14px; outline: none; transition: border-color 0.2s; }
+  input[type="text"]:focus { border-color: var(--accent); }
+  .hint { font-size: 0.7rem; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  .btn { display: block; width: 100%; max-width: 560px; margin: 0 auto; padding: 15px; background: var(--accent); color: #0d1117; border: none; border-radius: var(--radius); font-family: 'DM Mono', monospace; font-size: 0.85rem; font-weight: 500; letter-spacing: 0.08em; cursor: pointer; transition: opacity 0.2s, transform 0.1s; }
+  .btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-dl { background: var(--accent2); margin-top: 12px; display: none; }
+  #progress-section { display: none; max-width: 560px; margin: 20px auto 0; }
+  .progress-bar-wrap { background: var(--border); border-radius: 999px; height: 6px; overflow: hidden; margin-bottom: 14px; }
+  .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 999px; width: 0%; transition: width 0.4s ease; }
+  .log { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; height: 220px; overflow-y: auto; font-size: 0.72rem; line-height: 1.8; color: var(--muted); }
+  .log .ok   { color: var(--accent2); }
+  .log .info { color: var(--accent); }
+  .log .warn { color: var(--warn); }
+  #results-section { display: none; max-width: 560px; margin: 20px auto 0; }
+  .stat-row { display: flex; gap: 12px; margin-bottom: 16px; }
+  .stat { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; text-align: center; }
+  .stat .num { font-size: 1.6rem; font-family: 'Playfair Display', serif; color: var(--accent); }
+  .stat .lbl { font-size: 0.65rem; letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; margin-top: 4px; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.72rem; }
+  th { background: var(--surface); color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.65rem; padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 9px 12px; border-bottom: 1px solid #21262d; vertical-align: top; line-height: 1.4; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #1c2128; }
+  .rating-val { color: var(--accent2); font-weight: 500; }
+  .no-rating  { color: var(--muted); font-style: italic; }
+  .stars { color: #e3b341; letter-spacing: -1px; font-size: 0.75rem; }
+  #map { width: 1px; height: 1px; position: fixed; top: -9999px; left: -9999px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Hospital Ratings Collector</h1>
+  <p>MD · DC · VA · 150+ REVIEWS · GOOGLE PLACES</p>
+  <span class="version">VERSION 4</span>
+</header>
+
+<div class="card">
+  <label for="apiKey">Google Places API Key</label>
+  <input type="text" id="apiKey" placeholder="Paste your API key here…" autocomplete="off" spellcheck="false">
+  <p class="hint">Your key calls Google's API directly — never sent anywhere else.</p>
+</div>
+
+<button class="btn" id="runBtn" onclick="startCollection()">▶ &nbsp;Collect Hospital Ratings</button>
+<button class="btn btn-dl" id="dlBtn" onclick="downloadCSV()">⬇ &nbsp;Download CSV</button>
+
+<div id="progress-section">
+  <div class="card" style="padding:16px 20px 20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span style="font-size:0.72rem;letter-spacing:0.08em;color:var(--muted);text-transform:uppercase">Progress</span>
+      <span id="pct" style="font-size:0.72rem;color:var(--accent)">0%</span>
+    </div>
+    <div class="progress-bar-wrap"><div class="progress-bar-fill" id="bar"></div></div>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<div id="results-section">
+  <div class="stat-row">
+    <div class="stat"><div class="num" id="statTotal">0</div><div class="lbl">Hospitals</div></div>
+    <div class="stat"><div class="num" id="statRated">0</div><div class="lbl">With Ratings</div></div>
+    <div class="stat"><div class="num" id="statAvg">—</div><div class="lbl">Avg Rating</div></div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Hospital</th><th>Rating</th><th># Reviews</th></tr></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="map"></div>
+
+<script>
+  // ── Search grid: 70 tiles, lat 38.05–39.80, lng -77.75 to -75.95 ──────────
+  const GRID = [
+    {lat:38.05,lng:-77.75},{lat:38.05,lng:-77.45},{lat:38.05,lng:-77.15},{lat:38.05,lng:-76.85},{lat:38.05,lng:-76.55},{lat:38.05,lng:-76.25},{lat:38.05,lng:-75.95},
+    {lat:38.25,lng:-77.75},{lat:38.25,lng:-77.45},{lat:38.25,lng:-77.15},{lat:38.25,lng:-76.85},{lat:38.25,lng:-76.55},{lat:38.25,lng:-76.25},{lat:38.25,lng:-75.95},
+    {lat:38.45,lng:-77.75},{lat:38.45,lng:-77.45},{lat:38.45,lng:-77.15},{lat:38.45,lng:-76.85},{lat:38.45,lng:-76.55},{lat:38.45,lng:-76.25},{lat:38.45,lng:-75.95},
+    {lat:38.65,lng:-77.75},{lat:38.65,lng:-77.45},{lat:38.65,lng:-77.15},{lat:38.65,lng:-76.85},{lat:38.65,lng:-76.55},{lat:38.65,lng:-76.25},{lat:38.65,lng:-75.95},
+    {lat:38.85,lng:-77.75},{lat:38.85,lng:-77.45},{lat:38.85,lng:-77.15},{lat:38.85,lng:-76.85},{lat:38.85,lng:-76.55},{lat:38.85,lng:-76.25},{lat:38.85,lng:-75.95},
+    {lat:39.05,lng:-77.75},{lat:39.05,lng:-77.45},{lat:39.05,lng:-77.15},{lat:39.05,lng:-76.85},{lat:39.05,lng:-76.55},{lat:39.05,lng:-76.25},{lat:39.05,lng:-75.95},
+    {lat:39.25,lng:-77.75},{lat:39.25,lng:-77.45},{lat:39.25,lng:-77.15},{lat:39.25,lng:-76.85},{lat:39.25,lng:-76.55},{lat:39.25,lng:-76.25},{lat:39.25,lng:-75.95},
+    {lat:39.45,lng:-77.75},{lat:39.45,lng:-77.45},{lat:39.45,lng:-77.15},{lat:39.45,lng:-76.85},{lat:39.45,lng:-76.55},{lat:39.45,lng:-76.25},{lat:39.45,lng:-75.95},
+    {lat:39.65,lng:-77.75},{lat:39.65,lng:-77.45},{lat:39.65,lng:-77.15},{lat:39.65,lng:-76.85},{lat:39.65,lng:-76.55},{lat:39.65,lng:-76.25},{lat:39.65,lng:-75.95},
+    {lat:39.80,lng:-77.75},{lat:39.80,lng:-77.45},{lat:39.80,lng:-77.15},{lat:39.80,lng:-76.85},{lat:39.80,lng:-76.55},{lat:39.80,lng:-76.25},{lat:39.80,lng:-75.95},
+  ];
+
+  // Extra targeted text searches to catch hospitals that slip through the grid
+  // Each has a specific location and search query
+  const TARGETED = [
+    { query: "MedStar Washington Hospital Center",         lat: 38.9338, lng: -77.0283 },
+    { query: "MedStar National Rehabilitation Hospital",   lat: 38.9371, lng: -77.0297 },
+    { query: "hospital Washington DC",                     lat: 38.9072, lng: -77.0369 },
+    { query: "hospital Northwest Washington DC",           lat: 38.9400, lng: -77.0500 },
+    { query: "hospital Northeast Washington DC",           lat: 38.9200, lng: -76.9800 },
+    { query: "hospital Southeast Washington DC",           lat: 38.8700, lng: -76.9800 },
+    { query: "hospital Southwest Washington DC",           lat: 38.8700, lng: -77.0200 },
+  ];
+
+  const TILE_RADIUS_M   = 24140;  // 15 miles for grid
+  const TARGET_RADIUS_M = 8000;   // 5 miles for targeted searches
+  const MIN_REVIEWS     = 150;
+
+  // ── Filters ────────────────────────────────────────────────────────────────
+  function nameOk(name) {
+    const n = (name || "").toLowerCase();
+    return n.includes("hospital") || n.includes("medical center");
+  }
+
+  function stateOk(address) {
+    // Match ", MD", ", DC", or ", VA" followed by a space or end of string
+    return /, (MD|DC|VA)[\s,]/.test(address || "") ||
+           /, (MD|DC|VA)$/.test(address || "");
+  }
+
+  function reviewsOk(count) {
+    return typeof count === "number" && count >= MIN_REVIEWS;
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  let service, csvData = [];
+
+  function log(msg, cls = "") {
+    const el = document.getElementById("log");
+    const div = document.createElement("div");
+    if (cls) div.className = cls;
+    div.textContent = msg;
+    el.appendChild(div);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function setProgress(pct) {
+    document.getElementById("bar").style.width = pct + "%";
+    document.getElementById("pct").textContent = Math.round(pct) + "%";
+  }
+
+  function stars(r) {
+    const f = Math.round(r);
+    return "★".repeat(f) + "☆".repeat(5 - f);
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  function loadMapsAPI(apiKey) {
+    return new Promise((resolve, reject) => {
+      const old = document.getElementById("gmaps-script");
+      if (old) old.remove();
+      window.__mapsReady = () => {
+        try {
+          const map = new google.maps.Map(document.getElementById("map"), {
+            center: { lat: 39, lng: -77 }, zoom: 8
+          });
+          service = new google.maps.places.PlacesService(map);
+          resolve();
+        } catch(e) { reject(e); }
+      };
+      const s = document.createElement("script");
+      s.id = "gmaps-script";
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=__mapsReady`;
+      s.onerror = () => reject(new Error("Could not load Google Maps API. Check your API key."));
+      document.head.appendChild(s);
+    });
+  }
+
+  // nearbySearch for one grid tile — collects all pages
+  function nearbyTile(lat, lng) {
+    return new Promise((resolve, reject) => {
+      const found = new Map();
+      const handle = (results, status, pagination) => {
+        if (status === "REQUEST_DENIED") { reject(new Error("API key denied.")); return; }
+        if (["OK","ZERO_RESULTS"].includes(status)) {
+          (results||[]).forEach(r => { if (nameOk(r.name)) found.set(r.place_id, r); });
+        }
+        if (pagination && pagination.hasNextPage) {
+          setTimeout(() => pagination.nextPage(), 2500);
+        } else {
+          resolve(found);
+        }
+      };
+      service.nearbySearch({
+        location: new google.maps.LatLng(lat, lng),
+        radius: TILE_RADIUS_M,
+        type: "hospital",
+      }, handle);
+    });
+  }
+
+  // textSearch for targeted or grid keyword searches
+  function textSearch(query, lat, lng, radiusM) {
+    return new Promise((resolve, reject) => {
+      const found = new Map();
+      const handle = (results, status, pagination) => {
+        if (status === "REQUEST_DENIED") { reject(new Error("API key denied.")); return; }
+        if (["OK","ZERO_RESULTS"].includes(status)) {
+          (results||[]).forEach(r => { if (nameOk(r.name)) found.set(r.place_id, r); });
+        }
+        if (pagination && pagination.hasNextPage) {
+          setTimeout(() => pagination.nextPage(), 2500);
+        } else {
+          resolve(found);
+        }
+      };
+      service.textSearch({
+        query,
+        location: new google.maps.LatLng(lat, lng),
+        radius: radiusM,
+      }, handle);
+    });
+  }
+
+  function doGetDetails(placeId) {
+    return new Promise(resolve => {
+      service.getDetails(
+        { placeId, fields: ["name","formatted_address","rating","user_ratings_total"] },
+        (result, status) => resolve(status === "OK" ? result : null)
+      );
+    });
+  }
+
+  // ── Main ───────────────────────────────────────────────────────────────────
+  async function startCollection() {
+    const key = document.getElementById("apiKey").value.trim();
+    if (!key) { alert("Please enter your API key first."); return; }
+
+    document.getElementById("runBtn").disabled = true;
+    document.getElementById("dlBtn").style.display = "none";
+    document.getElementById("results-section").style.display = "none";
+    document.getElementById("progress-section").style.display = "block";
+    document.getElementById("log").innerHTML = "";
+    document.getElementById("tableBody").innerHTML = "";
+    setProgress(0);
+    csvData = [];
+
+    try {
+      log("Loading Google Maps API…", "info");
+      await loadMapsAPI(key);
+      log("Google Maps API loaded ✓", "ok");
+
+      const allPlaces = new Map();
+
+      // ── Pass 1: nearbySearch grid ──────────────────────────────────────────
+      log(`Pass 1: type=hospital across ${GRID.length} tiles…`, "info");
+      for (let i = 0; i < GRID.length; i++) {
+        const { lat, lng } = GRID[i];
+        setProgress(2 + (i / GRID.length) * 28);
+        const found = await nearbyTile(lat, lng);
+        let added = 0;
+        found.forEach((v,k) => { if (!allPlaces.has(k)) { allPlaces.set(k,v); added++; } });
+        if (added > 0) log(`  Tile ${i+1}/${GRID.length}: +${added} new (${allPlaces.size} total)`, "ok");
+        await sleep(300);
+      }
+      log(`Pass 1 done: ${allPlaces.size} candidates`, "ok");
+
+      // ── Pass 2: textSearch "hospital" grid ────────────────────────────────
+      log(`Pass 2: text="hospital" across ${GRID.length} tiles…`, "info");
+      for (let i = 0; i < GRID.length; i++) {
+        const { lat, lng } = GRID[i];
+        setProgress(30 + (i / GRID.length) * 28);
+        const found = await textSearch("hospital", lat, lng, TILE_RADIUS_M);
+        let added = 0;
+        found.forEach((v,k) => { if (!allPlaces.has(k)) { allPlaces.set(k,v); added++; } });
+        if (added > 0) log(`  Tile ${i+1}/${GRID.length}: +${added} new (${allPlaces.size} total)`, "ok");
+        await sleep(300);
+      }
+      log(`Pass 2 done: ${allPlaces.size} candidates`, "ok");
+
+      // ── Pass 3: targeted searches for specific known hospitals ─────────────
+      log(`Pass 3: ${TARGETED.length} targeted searches…`, "info");
+      for (let i = 0; i < TARGETED.length; i++) {
+        const { query, lat, lng } = TARGETED[i];
+        setProgress(58 + (i / TARGETED.length) * 5);
+        const found = await textSearch(query, lat, lng, TARGET_RADIUS_M);
+        let added = 0;
+        found.forEach((v,k) => { if (!allPlaces.has(k)) { allPlaces.set(k,v); added++; } });
+        log(`  "${query}": +${added} new`, added > 0 ? "ok" : "");
+        await sleep(500);
+      }
+      log(`Pass 3 done: ${allPlaces.size} total candidates`, "ok");
+
+      // ── Fetch details + apply all three filters ────────────────────────────
+      log(`Fetching details and applying filters…`, "info");
+      const ids = [...allPlaces.keys()];
+      const hospitals = [];
+      let skippedName = 0, skippedState = 0, skippedReviews = 0;
+
+      for (let i = 0; i < ids.length; i++) {
+        setProgress(63 + (i / ids.length) * 34);
+        const det = await doGetDetails(ids[i]);
+        if (!det) { await sleep(60); continue; }
+
+        const name    = det.name || "";
+        const address = det.formatted_address || "";
+        const rating  = det.rating != null ? det.rating : "";
+        const reviews = typeof det.user_ratings_total === "number" ? det.user_ratings_total : 0;
+
+        // Apply filters in sequence, log each rejection
+        if (!nameOk(name)) {
+          skippedName++;
+          // silent — these are the non-hospital results caught by pre-filter misses
+        } else if (!stateOk(address)) {
+          skippedState++;
+          log(`  ✗ [state] ${name} — ${address.split(",").slice(-2).join(",").trim()}`, "warn");
+        } else if (!reviewsOk(reviews)) {
+          skippedReviews++;
+          log(`  ✗ [reviews] ${name} — ${reviews} reviews`);
+        } else {
+          hospitals.push({ name, address, rating, reviews });
+          log(`  ✓ ${name} (${reviews} reviews)`, "ok");
+        }
+        await sleep(60);
+      }
+
+      hospitals.sort((a, b) => a.name.localeCompare(b.name));
+      setProgress(100);
+      csvData = hospitals;
+
+      log(`\nSummary: kept ${hospitals.length} | removed ${skippedName} wrong name, ${skippedState} wrong state, ${skippedReviews} <${MIN_REVIEWS} reviews`, "info");
+
+      const rated = hospitals.filter(h => h.rating !== "");
+      const avg = rated.length
+        ? (rated.reduce((s,h) => s + Number(h.rating), 0) / rated.length).toFixed(2)
+        : "—";
+
+      document.getElementById("statTotal").textContent = hospitals.length;
+      document.getElementById("statRated").textContent = rated.length;
+      document.getElementById("statAvg").textContent   = avg;
+
+      const tbody = document.getElementById("tableBody");
+      hospitals.forEach(h => {
+        const tr = document.createElement("tr");
+        const ratingCell = h.rating !== ""
+          ? `<span class="rating-val">${h.rating}</span> <span class="stars">${stars(h.rating)}</span>`
+          : `<span class="no-rating">n/a</span>`;
+        tr.innerHTML = `
+          <td>${h.name}<br><span style="color:var(--muted);font-size:0.65rem">${h.address}</span></td>
+          <td>${ratingCell}</td>
+          <td>${Number(h.reviews).toLocaleString()}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById("results-section").style.display = "block";
+      document.getElementById("dlBtn").style.display = "block";
+      log(`\n✅ Done! ${hospitals.length} hospitals collected.`, "ok");
+
+    } catch (err) {
+      log("❌ " + err.message, "warn");
+    } finally {
+      document.getElementById("runBtn").disabled = false;
+    }
+  }
+
+  // ── CSV download ───────────────────────────────────────────────────────────
+  function downloadCSV() {
+    if (!csvData.length) return;
+    const header = ["Name","Address","Rating","Total Reviews"];
+    const rows = csvData.map(h => [
+      `"${h.name.replace(/"/g,'""')}"`,
+      `"${h.address.replace(/"/g,'""')}"`,
+      h.rating,
+      h.reviews,
+    ]);
+    const csv = [header,...rows].map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], {type:"text/csv"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "hospital_ratings.csv";
+    a.click();
+  }
+</script>
+</body>
+</html>
